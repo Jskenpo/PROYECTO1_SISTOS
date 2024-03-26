@@ -26,7 +26,7 @@ Este proyecto consiste en un servidor de chat desarrollado en C para el curso de
 
 ## Autor
 
-Este proyecto fue desarrollado por [Tu Nombre] como parte del curso de Sistemas Operativos de la Universidad del Valle de Guatemala.
+Este proyecto fue desarrollado por José Pablo Santisteban y Diego Valdez como parte del curso de Sistemas Operativos de la Universidad del Valle de Guatemala.
 
 ## Contribuciones
 
@@ -38,6 +38,3 @@ Las contribuciones son bienvenidas. Si deseas contribuir a este proyecto, sigue 
 4. Sube tus cambios a tu fork del repositorio (`git push origin feature/nueva-funcion`).
 5. Haz un pull request para que tus cambios sean revisados y fusionados.
 
-## Licencia
-
-Este proyecto está bajo la Licencia [Nombre de la Licencia]. Para más detalles, consulta el archivo `LICENSE`.
