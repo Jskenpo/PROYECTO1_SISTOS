@@ -10,7 +10,7 @@
 #define BUFFER_SIZE 1024
 #define DEFAULT_PORT 8888
 
-// Structure to represent a client
+// Estructura para representar a un cliente
 typedef struct {
     int socket;
     char username[50];
@@ -18,7 +18,7 @@ typedef struct {
     char status[20];
 } Client;
 
-// Structure to store server information
+// Estructura para almacenar la información del servidor
 typedef struct {
     Client clients[MAX_CLIENTS];
     int client_count;
@@ -27,209 +27,138 @@ typedef struct {
 
 ServerInfo server;
 
-// Function prototypes
-void *handle_client(void *arg);
-void handle_request(int client_socket, int option);
-void register_user(int client_socket, char *username, char *ip);
-void send_connected_users(int client_socket);
-void change_status(char *username, char *status);
-void send_message(int client_socket, char *recipient, char *message_text);
-void send_user_info(int client_socket, char *username);
-void send_response(int client_socket, int option, int code, char *message);
+// Prototipos de funciones
+void manejar_solicitud(int client_socket, int option);
+void registrar_usuario(int client_socket, char *username, char *ip);
+void enviar_usuarios_conectados(int client_socket);
+void cambiar_estado(char *username, char *status);
+void enviar_mensaje(int client_socket, char *recipient, char *message_text);
+void enviar_info_usuario(int client_socket, char *username);
+void enviar_respuesta(int client_socket, int option, int code, char *message);
 
-int main(int argc, char *argv[]) {
-    int server_socket, client_socket, port;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t client_len = sizeof(client_addr);
-    pthread_t tid;
-
-    // Check if a port was provided as an argument, otherwise use the default port
-    if (argc < 2) {
-        port = DEFAULT_PORT;
-    } else {
-        port = atoi(argv[1]);
-    }
-
-    // Create server socket
-    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        perror("Failed to create socket");
-        exit(EXIT_FAILURE);
-    }
-
-    // Set up server address
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
-
-    // Bind server socket
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        perror("Failed to bind");
-        exit(EXIT_FAILURE);
-    }
-
-    // Listen for incoming connections
-    if (listen(server_socket, 5) < 0) {
-        perror("Failed to listen");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Server listening on port %d...\n", port);
-
-    // Initialize server structure
-    server.client_count = 0;
-    pthread_mutex_init(&server.mutex, NULL);
-
-    while (1) {
-        // Accept incoming connection
-        if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len)) < 0) {
-            perror("Failed to accept");
-            exit(EXIT_FAILURE);
-        }
-
-        // Create a thread to handle the client
-        if (pthread_create(&tid, NULL, handle_client, &client_socket) != 0) {
-            perror("Failed to create thread");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    close(server_socket);
-    pthread_mutex_destroy(&server.mutex);
-
-    return 0;
-}
-
-// Function to handle client connections
-void *handle_client(void *arg) {
+// Función para manejar las conexiones de los clientes
+void *manejar_cliente(void *arg) {
     int client_socket = *((int *)arg);
-    char buffer[BUFFER_SIZE];
     int option;
 
-    // Read the client's option
+    // Leer la opción del cliente
     if (recv(client_socket, &option, sizeof(int), 0) <= 0) {
-        perror("Error receiving option from client");
+        perror("Error al recibir la opción del cliente");
         close(client_socket);
         pthread_exit(NULL);
     }
 
-    // Handle the client's request
-    handle_request(client_socket, option);
+    // Manejar la solicitud del cliente
+    manejar_solicitud(client_socket, option);
 
     close(client_socket);
     pthread_exit(NULL);
 }
 
-// Function to handle client requests
-void handle_request(int client_socket, int option) {
+// Función para manejar las solicitudes de los clientes
+void manejar_solicitud(int client_socket, int option) {
+    int code;
+    char message[BUFFER_SIZE];
+
     switch (option) {
-        case 1: // User Registration
+        case 1: // Registro de Usuarios
             {
                 char username[50], ip[INET_ADDRSTRLEN];
-                // Receive client's registration data
+                // Recibir los datos de registro del cliente
                 if (recv(client_socket, &username, sizeof(username), 0) <= 0 || recv(client_socket, &ip, sizeof(ip), 0) <= 0) {
-                    perror("Error receiving user registration data from client");
+                    perror("Error al recibir los datos de registro del cliente");
                     close(client_socket);
                     pthread_exit(NULL);
                 }
-                register_user(client_socket, username, ip);
+                registrar_usuario(client_socket, username, ip);
             }
             break;
-        case 2: // Connected Users
+        case 2: // Usuarios Conectados
             {
-                send_connected_users(client_socket);
+                enviar_usuarios_conectados(client_socket);
             }
             break;
-        case 3: // Status Change
+        case 3: // Cambio de Estado
             {
                 char username[50], status[20];
-                // Receive client's status change data
+                // Recibir los datos de cambio de estado del cliente
                 if (recv(client_socket, &username, sizeof(username), 0) <= 0 || recv(client_socket, &status, sizeof(status), 0) <= 0) {
-                    perror("Error receiving status change data from client");
+                    perror("Error al recibir los datos de cambio de estado del cliente");
                     close(client_socket);
                     pthread_exit(NULL);
                 }
-                change_status(username, status);
+                cambiar_estado(username, status);
             }
             break;
-        case 4: // Messages
+        case 4: // Mensajes
             {
                 char recipient[50], message_text[BUFFER_SIZE];
-                // Receive client's message data
+                // Recibir los datos del mensaje del cliente
                 if (recv(client_socket, &recipient, sizeof(recipient), 0) <= 0 || recv(client_socket, &message_text, sizeof(message_text), 0) <= 0) {
-                    perror("Error receiving message data from client");
+                    perror("Error al recibir los datos del mensaje del cliente");
                     close(client_socket);
                     pthread_exit(NULL);
                 }
-                send_message(client_socket, recipient, message_text);
+                enviar_mensaje(client_socket, recipient, message_text);
             }
             break;
-        case 5: // Information of a particular user
+        case 5: // Información de un usuario en particular
             {
                 char username[50];
-                // Receive client's username
+                // Recibir el nombre de usuario del cliente
                 if (recv(client_socket, &username, sizeof(username), 0) <= 0) {
-                    perror("Error receiving username from client");
+                    perror("Error al recibir el nombre de usuario del cliente");
                     close(client_socket);
                     pthread_exit(NULL);
                 }
-                send_user_info(client_socket, username);
+                enviar_info_usuario(client_socket, username);
             }
             break;
         default:
-            // Invalid option
-            int code = 500;
-            char message[BUFFER_SIZE];
-            sprintf(message, "Error: Invalid option");
-            send_response(client_socket, option, code, message);
+            // Opción no válida
+            code = 500;
+            sprintf(message, "Error: Opción inválida");
+            enviar_respuesta(client_socket, option, code, message);
             break;
     }
 }
 
-// Function to register a new user
-void register_user(int client_socket, char *username, char *ip) {
+// Función para registrar a un nuevo usuario
+void registrar_usuario(int client_socket, char *username, char *ip) {
     int code;
     char message[BUFFER_SIZE];
 
-    // Lock access to the server structure to prevent race conditions
+    // Bloquear el acceso a la estructura del servidor para evitar condiciones de carrera
     pthread_mutex_lock(&server.mutex);
 
-    // Check if the user is already registered
+    // Verificar si el usuario ya está registrado
     for (int i = 0; i < server.client_count; i++) {
         if (strcmp(server.clients[i].username, username) == 0) {
-            code = 500; // User already registered
-            sprintf(message, "Error: User '%s' already exists", username);
-            send_response(client_socket, 1, code, message);
+            code = 500; // Usuario ya registrado
+            sprintf(message, "Error: El usuario '%s' ya existe", username);
+            enviar_respuesta(client_socket, 1, code, message);
             pthread_mutex_unlock(&server.mutex);
             return;
         }
     }
 
-    // Check limits to prevent buffer overflows
-    if (strlen(username) >= sizeof(server.clients[0].username) || strlen(ip) >= INET_ADDRSTRLEN) {
-        code = 500; // Invalid registration data
-        sprintf(message, "Error: Invalid user registration data");
-        send_response(client_socket, 1, code, message);
-        pthread_mutex_unlock(&server.mutex);
-        return;
-    }
-
-    // Register the new user
+    // Registrar al nuevo usuario
     strcpy(server.clients[server.client_count].username, username);
     strcpy(server.clients[server.client_count].ip, ip);
-    strcpy(server.clients[server.client_count].status, "ACTIVE");
+    strcpy(server.clients[server.client_count].status, "ACTIVO");
     server.clients[server.client_count].socket = client_socket;
     server.client_count++;
 
-    // Send successful response to client
+    // Enviar respuesta exitosa al cliente
     code = 200;
-    sprintf(message, "User '%s' registered successfully", username);
-    send_response(client_socket, 1, code, message);
+    sprintf(message, "Usuario '%s' registrado con éxito", username);
+    enviar_respuesta(client_socket, 1, code, message);
 
     pthread_mutex_unlock(&server.mutex);
 }
 
-// Function to send the list of connected users to the client
-void send_connected_users(int client_socket) {
+// Función para enviar la lista de usuarios conectados al cliente
+void enviar_usuarios_conectados(int client_socket) {
     int count = server.client_count;
     send(client_socket, &count, sizeof(int), 0);
     for (int i = 0; i < server.client_count; i++) {
@@ -237,14 +166,14 @@ void send_connected_users(int client_socket) {
     }
 }
 
-// Function to change a user's status
-void change_status(char *username, char *status) {
+// Función para cambiar el estado de un usuario
+void cambiar_estado(char *username, char *status) {
     pthread_mutex_lock(&server.mutex);
 
-    // Search for the user in the client list
+    // Buscar al usuario en la lista de clientes
     for (int i = 0; i < server.client_count; i++) {
         if (strcmp(server.clients[i].username, username) == 0) {
-            // Update the user's status
+            // Actualizar el estado del usuario
             strcpy(server.clients[i].status, status);
             break;
         }
@@ -253,20 +182,14 @@ void change_status(char *username, char *status) {
     pthread_mutex_unlock(&server.mutex);
 }
 
-// Function to send a message to a user
-void send_message(int client_socket, char *recipient, char *message_text) {
+// Función para enviar un mensaje a un usuario
+void enviar_mensaje(int client_socket, char *recipient, char *message_text) {
     pthread_mutex_lock(&server.mutex);
 
-    // Check limits to prevent buffer overflows
-    if (strlen(recipient) >= sizeof(server.clients[0].username) || strlen(message_text) >= BUFFER_SIZE) {
-        pthread_mutex_unlock(&server.mutex);
-        return;
-    }
-
-    // Search for the recipient in the client list
+    // Buscar al destinatario en la lista de clientes
     for (int i = 0; i < server.client_count; i++) {
         if (strcmp(server.clients[i].username, recipient) == 0) {
-            // Send the message to the recipient
+            // Enviar el mensaje al destinatario
             send(server.clients[i].socket, message_text, strlen(message_text), 0);
             break;
         }
@@ -275,20 +198,14 @@ void send_message(int client_socket, char *recipient, char *message_text) {
     pthread_mutex_unlock(&server.mutex);
 }
 
-// Function to send a user's information to the client
-void send_user_info(int client_socket, char *username) {
+// Función para enviar la información de un usuario al cliente
+void enviar_info_usuario(int client_socket, char *username) {
     pthread_mutex_lock(&server.mutex);
 
-    // Check limits to prevent buffer overflows
-    if (strlen(username) >= sizeof(server.clients[0].username)) {
-        pthread_mutex_unlock(&server.mutex);
-        return;
-    }
-
-    // Search for the user in the client list
+    // Buscar al usuario en la lista de clientes
     for (int i = 0; i < server.client_count; i++) {
         if (strcmp(server.clients[i].username, username) == 0) {
-            // Send the user's information to the client
+            // Enviar la información del usuario al cliente
             send(client_socket, &server.clients[i], sizeof(Client), 0);
             break;
         }
@@ -297,9 +214,67 @@ void send_user_info(int client_socket, char *username) {
     pthread_mutex_unlock(&server.mutex);
 }
 
-// Function to send a response to the client
-void send_response(int client_socket, int option, int code, char *message) {
+// Función para enviar una respuesta al cliente
+void enviar_respuesta(int client_socket, int option, int code, char *message) {
     send(client_socket, &option, sizeof(int), 0);
     send(client_socket, &code, sizeof(int), 0);
     send(client_socket, message, strlen(message), 0);
+}
+
+int main(int argc, char *argv[]) {
+    int server_socket, client_socket, port;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    pthread_t tid;
+
+    // Verificar si se proporcionó un puerto como argumento, de lo contrario, usar el puerto predeterminado
+    port = (argc < 2) ? DEFAULT_PORT : atoi(argv[1]);
+
+    // Crear socket del servidor
+    if ((server_socket = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("Error en la creación del socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configurar la dirección del servidor
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+
+    // Enlazar el socket del servidor
+    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+        perror("Error en el enlace del socket");
+        exit(EXIT_FAILURE);
+    }
+
+    // Escuchar por conexiones entrantes
+    if (listen(server_socket, 5) < 0) {
+        perror("Error en la escucha del socket");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Servidor escuchando en el puerto %d...\n", port);
+
+    // Inicializar la estructura del servidor
+    server.client_count = 0;
+    pthread_mutex_init(&server.mutex, NULL);
+
+    while (1) {
+        // Aceptar la conexión entrante
+        if ((client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_len)) < 0) {
+            perror("Error al aceptar la conexión");
+            exit(EXIT_FAILURE);
+        }
+
+        // Crear un hilo para manejar al cliente
+        if (pthread_create(&tid, NULL, manejar_cliente, &client_socket) != 0) {
+            perror("Error en la creación del hilo");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    close(server_socket);
+    pthread_mutex_destroy(&server.mutex);
+
+    return 0;
 }
